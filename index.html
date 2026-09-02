@@ -1,0 +1,823 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EH BGM 콘솔</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#15171c">
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#15171c;
+  --surface:#1d2027;
+  --surface-2:#262a33;
+  --line:#333944;
+  --text:#eceef1;
+  --text-muted:#8b93a1;
+  --amber:#d98e4a;
+  --amber-dim:#7a5433;
+  --green:#6fae7c;
+  --red:#c8695f;
+  --focus:#d98e4a;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:"IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+.mono{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+.wrap{
+  max-width:520px;
+  margin:0 auto;
+  padding:28px 18px 60px;
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+}
+
+header.top{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:12px;
+}
+header.top h1{
+  font-size:15px;
+  font-weight:600;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--text-muted);
+  margin:0;
+}
+header.top .dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--line);
+  display:inline-block;
+  margin-right:7px;
+  vertical-align:1px;
+}
+header.top .dot.on{ background:var(--green); box-shadow:0 0 0 3px color-mix(in srgb, var(--green) 25%, transparent); }
+header.top .role{ font-size:12px; color:var(--text-muted); }
+
+.now{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:22px 20px;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.now .label{ font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); }
+.now .title{
+  font-size:22px;
+  font-weight:600;
+  line-height:1.3;
+  text-wrap:balance;
+  min-height:1.3em;
+}
+.now .title.empty{ color:var(--text-muted); font-weight:400; }
+
+.meter{
+  display:flex;
+  gap:3px;
+  align-items:flex-end;
+  height:20px;
+}
+.meter i{
+  flex:1;
+  background:var(--line);
+  border-radius:1px;
+  min-height:3px;
+  transition:background .2s;
+}
+.meter i.lit{ background:var(--amber); }
+
+.progress{
+  height:4px;
+  border-radius:2px;
+  background:var(--surface-2);
+  overflow:hidden;
+  position:relative;
+}
+.progress .fill{
+  position:absolute; inset:0 auto 0 0;
+  width:0%;
+  background:var(--amber);
+  border-radius:2px;
+}
+.time-row{
+  display:flex; justify-content:space-between;
+  font-size:12px; color:var(--text-muted);
+}
+
+.controls{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:22px;
+}
+.controls button{
+  background:none; border:none; color:var(--text);
+  cursor:pointer; padding:8px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:10px;
+}
+.controls button:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+.controls button:hover{ background:var(--surface-2); }
+.controls .play-btn{
+  width:56px; height:56px; border-radius:50%;
+  background:var(--amber); color:#1a1206;
+}
+.controls .play-btn:hover{ background:#e39c5a; }
+.controls svg{ width:22px; height:22px; }
+.controls .play-btn svg{ width:24px; height:24px; }
+
+.row-slim{
+  display:flex; align-items:center; gap:12px;
+}
+.row-slim label{ font-size:12px; color:var(--text-muted); width:44px; flex-shrink:0; }
+input[type="range"]{
+  -webkit-appearance:none; appearance:none;
+  width:100%; height:4px; border-radius:2px;
+  background:var(--surface-2);
+}
+input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none;
+  width:16px; height:16px; border-radius:50%;
+  background:var(--amber); cursor:pointer;
+  border:2px solid var(--surface);
+}
+input[type="range"]::-moz-range-thumb{
+  width:16px; height:16px; border-radius:50%;
+  background:var(--amber); cursor:pointer; border:2px solid var(--surface);
+}
+
+.toggle-group{
+  display:flex; gap:6px;
+}
+.chip{
+  font-size:12px; padding:6px 12px; border-radius:999px;
+  border:1px solid var(--line); background:transparent; color:var(--text-muted);
+  cursor:pointer;
+}
+.chip:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+.chip.active{ background:var(--amber-dim); border-color:var(--amber); color:var(--text); }
+
+.section-label{
+  font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted);
+  padding:0 2px;
+}
+.playlist{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:14px;
+  overflow:hidden;
+}
+.track{
+  display:flex; align-items:center; gap:10px;
+  padding:12px 14px;
+  border-bottom:1px solid var(--line);
+}
+.track:last-child{ border-bottom:none; }
+.track.playing{ background:var(--surface-2); }
+.track .idx{ width:20px; font-size:12px; color:var(--text-muted); flex-shrink:0; }
+.track .idx .eq{ display:inline-flex; gap:2px; align-items:flex-end; height:12px; }
+.track .idx .eq i{ width:2px; background:var(--amber); border-radius:1px; }
+.track .meta{ flex:1; min-width:0; cursor:pointer; }
+.track .meta .t{ font-size:14px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.track .meta .u{ font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.track .del{
+  background:none; border:none; color:var(--text-muted); cursor:pointer;
+  padding:6px; border-radius:8px; flex-shrink:0;
+}
+.track .del:hover{ background:var(--surface-2); color:var(--red); }
+
+.add-form{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:14px;
+  display:flex; flex-direction:column; gap:8px;
+}
+.add-form input{
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:10px 12px;
+  color:var(--text);
+  font-size:14px;
+  font-family:inherit;
+}
+.add-form input:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
+.add-form input::placeholder{ color:var(--text-muted); }
+.add-form button{
+  background:var(--amber); color:#1a1206; border:none;
+  border-radius:8px; padding:10px 12px; font-size:14px; font-weight:600;
+  cursor:pointer;
+}
+.add-form button:disabled{ opacity:.5; cursor:default; }
+
+.empty-note{
+  padding:20px 14px; text-align:center; color:var(--text-muted); font-size:13px;
+}
+
+.device-panel{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:14px;
+  display:flex; flex-direction:column; gap:10px;
+}
+.device-panel .head{
+  display:flex; justify-content:space-between; align-items:center;
+}
+.device-panel .status-line{
+  font-size:12px; color:var(--text-muted);
+  display:flex; align-items:center; gap:6px;
+}
+.device-panel .status-line .dot{ width:6px;height:6px;border-radius:50%; background:var(--line); }
+.device-panel .status-line .dot.fresh{ background:var(--green); }
+.device-panel .status-line .dot.stale{ background:var(--red); }
+.player-hint{
+  font-size:12px; color:var(--text-muted); line-height:1.5;
+}
+.start-btn{
+  background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+  border-radius:8px; padding:10px; font-size:13px; cursor:pointer;
+}
+.start-btn.needed{ border-color:var(--amber); color:var(--amber); }
+
+.foot-note{
+  text-align:center; font-size:11px; color:var(--text-muted); padding-top:6px;
+}
+.foot-note a{ color:var(--text-muted); }
+
+audio{ display:none; }
+
+@media (prefers-reduced-motion: reduce){
+  .meter i, .progress .fill{ transition:none; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <h1><span class="dot" id="connDot"></span>EH BGM</h1>
+    <span class="role mono" id="roleLabel">—</span>
+  </header>
+
+  <div class="now">
+    <div class="label">지금 재생 중</div>
+    <div class="title empty" id="nowTitle">불러오는 중…</div>
+    <div class="meter" id="meter"></div>
+    <div class="progress"><div class="fill" id="progressFill"></div></div>
+    <div class="time-row mono">
+      <span id="timeCur">0:00</span>
+      <span id="timeDur">0:00</span>
+    </div>
+    <div class="controls">
+      <button id="prevBtn" aria-label="이전 곡">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 11-6v12z" transform="scale(-1,1) translate(-24,0)"/></svg>
+      </button>
+      <button class="play-btn" id="playBtn" aria-label="재생">
+        <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button id="nextBtn" aria-label="다음 곡">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 11-6v12z"/></svg>
+      </button>
+    </div>
+    <div class="row-slim">
+      <label>볼륨</label>
+      <input type="range" id="volSlider" min="0" max="100" value="80">
+    </div>
+    <div class="row-slim">
+      <label>반복</label>
+      <div class="toggle-group">
+        <button class="chip" data-loop="all" id="loopAll">전체 반복</button>
+        <button class="chip" data-loop="one" id="loopOne">한 곡 반복</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-label" style="margin-bottom:8px;">재생목록</div>
+    <div class="playlist" id="playlist">
+      <div class="empty-note">불러오는 중…</div>
+    </div>
+  </div>
+
+  <form class="add-form" id="addForm">
+    <input type="text" id="addTitle" placeholder="곡 제목 (예: Suno - 매장 오프닝)" maxlength="120">
+    <input type="text" id="addUrl" placeholder="mp3 파일명 또는 URL (예: cozy-focus-1.mp3)" maxlength="1000" required>
+    <button type="submit">재생목록에 추가</button>
+  </form>
+
+  <div class="device-panel">
+    <div class="head">
+      <span class="section-label">이 기기</span>
+    </div>
+    <div class="toggle-group">
+      <button class="chip" id="roleController">컨트롤러로 사용</button>
+      <button class="chip" id="rolePlayer">재생 기기로 사용</button>
+    </div>
+    <div class="status-line" id="statusLine">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">연결 대기 중…</span>
+    </div>
+    <div class="player-hint" id="playerHint" hidden>
+      이 기기를 매장 스피커에 연결한 뒤, 아래 버튼을 한 번 눌러 재생을 시작하세요.
+      화면이 꺼져도 재생은 유지됩니다. 잠금화면 컨트롤로도 조작할 수 있어요.
+    </div>
+    <button class="start-btn" id="startPlayerBtn" hidden>탭하여 재생 시작</button>
+  </div>
+
+  <div class="foot-note">EH BGM · GitHub Pages + Firebase</div>
+</div>
+
+<audio id="audioEl" preload="auto"></audio>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, doc, onSnapshot, setDoc, getDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDN0imO5PkqZSgaU9xw0uzDZRbbFT1AIF8",
+  authDomain: "eh-bgm.firebaseapp.com",
+  projectId: "eh-bgm",
+  storageBucket: "eh-bgm.firebasestorage.app",
+  messagingSenderId: "994184858255",
+  appId: "1:994184858255:web:742b17e3becc443fdebefa",
+  measurementId: "G-LSSX41ZMXM"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+(function(){
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    connDot: $("connDot"), roleLabel: $("roleLabel"),
+    nowTitle: $("nowTitle"), meter: $("meter"), progressFill: $("progressFill"),
+    timeCur: $("timeCur"), timeDur: $("timeDur"),
+    prevBtn: $("prevBtn"), playBtn: $("playBtn"), playIcon: $("playIcon"), nextBtn: $("nextBtn"),
+    volSlider: $("volSlider"), loopAll: $("loopAll"), loopOne: $("loopOne"),
+    playlist: $("playlist"), addForm: $("addForm"), addTitle: $("addTitle"), addUrl: $("addUrl"),
+    roleController: $("roleController"), rolePlayer: $("rolePlayer"),
+    statusLine: $("statusLine"), statusDot: $("statusDot"), statusText: $("statusText"),
+    playerHint: $("playerHint"), startPlayerBtn: $("startPlayerBtn"),
+    audioEl: $("audioEl"),
+  };
+
+  const ICON_PLAY = '<path d="M8 5v14l11-7z"/>';
+  const ICON_PAUSE = '<path d="M7 5h4v14H7zm6 0h4v14h-4z"/>';
+
+  const DEVICE_KEY = "eh_bgm_role";
+  let role = localStorage.getItem(DEVICE_KEY) || null; // 'player' | 'controller' | null
+  let deviceId = localStorage.getItem("eh_bgm_device_id");
+  if (!deviceId) {
+    deviceId = "dev-" + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem("eh_bgm_device_id", deviceId);
+  }
+
+  const DEFAULT_TRACKS = [
+    { id: "t-cozy-focus-1", title: "Cozy Focus 1", url: "cozy-focus-1.mp3" },
+    { id: "t-cozy-focus-2", title: "Cozy Focus 2", url: "cozy-focus-2.mp3" },
+    { id: "t-nordic-cafe-drift", title: "Nordic Cafe Drift", url: "nordic-cafe-drift.mp3" },
+    { id: "t-nordic-calm-1", title: "Nordic Calm 1", url: "nordic-calm-1.mp3" },
+    { id: "t-nordic-calm-2", title: "Nordic Calm 2", url: "nordic-calm-2.mp3" },
+    { id: "t-nordic-cup-loops-1", title: "Nordic Cup Loops 1", url: "nordic-cup-loops-1.mp3" },
+    { id: "t-nordic-cup-loops-2", title: "Nordic Cup Loops 2", url: "nordic-cup-loops-2.mp3" },
+    { id: "t-nordic-rhodes-drift-1", title: "Nordic Rhodes Drift 1", url: "nordic-rhodes-drift-1.mp3" },
+    { id: "t-nordic-rhodes-drift-2", title: "Nordic Rhodes Drift 2", url: "nordic-rhodes-drift-2.mp3" },
+    { id: "t-nordic-study-atmosphere-1", title: "Nordic Study Atmosphere 1", url: "nordic-study-atmosphere-1.mp3" },
+    { id: "t-nordic-study-atmosphere-2", title: "Nordic Study Atmosphere 2", url: "nordic-study-atmosphere-2.mp3" },
+    { id: "t-nordic-study-lounge-1", title: "Nordic Study Lounge 1", url: "nordic-study-lounge-1.mp3" },
+    { id: "t-nordic-study-room-1", title: "Nordic Study Room 1", url: "nordic-study-room-1.mp3" },
+    { id: "t-nordic-study-room-2", title: "Nordic Study Room 2", url: "nordic-study-room-2.mp3" },
+    { id: "t-quiet-cafe-ambience-1", title: "Quiet Cafe Ambience 1", url: "quiet-cafe-ambience-1.mp3" },
+    { id: "t-quiet-cafe-ambience-2", title: "Quiet Cafe Ambience 2", url: "quiet-cafe-ambience-2.mp3" },
+    { id: "t-quiet-cafe-study-1", title: "Quiet Cafe Study 1", url: "quiet-cafe-study-1.mp3" },
+    { id: "t-quiet-cafe-study-2", title: "Quiet Cafe Study 2", url: "quiet-cafe-study-2.mp3" },
+  ];
+
+  let config = { tracks: [], volume: 80, loopMode: "all" };
+  let control = { isPlaying: false, currentTrackId: null, updatedAt: 0 };
+  let status = { currentTrackId: null, isPlaying: false, position: 0, lastHeartbeat: 0, deviceId: null };
+
+  let playerStarted = false;
+  let seeking = false;
+
+  function fmtTime(s) {
+    if (!isFinite(s) || s < 0) s = 0;
+    const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    return m + ":" + String(sec).padStart(2, "0");
+  }
+
+  function trackById(id) {
+    return config.tracks.find(t => t.id === id) || null;
+  }
+
+  function validCurrentId() {
+    if (trackById(control.currentTrackId)) return control.currentTrackId;
+    return (config.tracks[0] && config.tracks[0].id) || null;
+  }
+
+  function nextTrackId(fromId, direction) {
+    const list = config.tracks;
+    if (!list.length) return null;
+    if (config.loopMode === "one" && direction === "auto") return fromId;
+    let idx = list.findIndex(t => t.id === fromId);
+    if (idx === -1) idx = -1;
+    idx += direction === "prev" ? -1 : 1;
+    if (idx < 0) idx = list.length - 1;
+    if (idx >= list.length) idx = 0;
+    return list[idx].id;
+  }
+
+  // ---------- Rendering ----------
+  function renderMeter(active) {
+    els.meter.innerHTML = "";
+    for (let i = 0; i < 24; i++) {
+      const bar = document.createElement("i");
+      const h = active ? (4 + Math.round(Math.abs(Math.sin(i * 1.3)) * 16)) : 3;
+      bar.style.height = h + "px";
+      if (active && i % 3 === 0) bar.classList.add("lit");
+      els.meter.appendChild(bar);
+    }
+  }
+
+  function renderNow() {
+    const t = trackById(control.currentTrackId) || trackById(status.currentTrackId);
+    if (t) {
+      els.nowTitle.textContent = t.title || t.url;
+      els.nowTitle.classList.remove("empty");
+    } else {
+      els.nowTitle.textContent = config.tracks.length ? "재생할 곡을 선택하세요" : "재생목록이 비어 있습니다";
+      els.nowTitle.classList.add("empty");
+    }
+    const playing = role === "player" ? !els.audioEl.paused : status.isPlaying;
+    els.playIcon.innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+    renderMeter(playing);
+    els.loopAll.classList.toggle("active", config.loopMode === "all");
+    els.loopOne.classList.toggle("active", config.loopMode === "one");
+  }
+
+  function renderPlaylist() {
+    if (!config.tracks.length) {
+      els.playlist.innerHTML = '<div class="empty-note">아래에서 음원을 추가하세요</div>';
+      return;
+    }
+    els.playlist.innerHTML = "";
+    const activeId = control.currentTrackId || status.currentTrackId;
+    config.tracks.forEach((t, i) => {
+      const row = document.createElement("div");
+      row.className = "track" + (t.id === activeId ? " playing" : "");
+      const isPlayingRow = t.id === activeId && (role === "player" ? !els.audioEl.paused : status.isPlaying);
+      row.innerHTML = `
+        <div class="idx mono">${isPlayingRow ? '<span class="eq">'+[5,9,4].map(h=>`<i style="height:${h}px"></i>`).join("")+'</span>' : (i+1)}</div>
+        <div class="meta" data-id="${t.id}">
+          <div class="t"></div>
+          <div class="u mono"></div>
+        </div>
+        <button class="del" data-id="${t.id}" aria-label="삭제">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 7h12l-1 13H7zm3-4h6l1 2H8zM9 10v7m6-7v7" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+        </button>`;
+      row.querySelector(".t").textContent = t.title || "(제목 없음)";
+      row.querySelector(".u").textContent = t.url;
+      els.playlist.appendChild(row);
+    });
+  }
+
+  function renderRole() {
+    els.roleLabel.textContent = role === "player" ? "재생 기기" : role === "controller" ? "컨트롤러" : "역할 미설정";
+    els.roleController.classList.toggle("active", role === "controller");
+    els.rolePlayer.classList.toggle("active", role === "player");
+    els.playerHint.hidden = role !== "player";
+    els.startPlayerBtn.hidden = !(role === "player" && !playerStarted);
+    els.volSlider.value = config.volume;
+  }
+
+  function renderStatus() {
+    const age = status.lastHeartbeat ? (Date.now() - status.lastHeartbeat) / 1000 : Infinity;
+    if (role === "player") {
+      const playing = playerStarted && !els.audioEl.paused;
+      els.statusDot.className = "dot " + (playing ? "fresh" : "");
+      els.statusText.textContent = els.audioEl.dataset.loadError
+        ? "재생 오류: 링크를 확인해주세요 (" + els.audioEl.dataset.loadError + ")"
+        : !playerStarted ? "재생을 시작해주세요"
+        : playing ? "이 기기가 재생 중입니다"
+        : control.currentTrackId ? "일시정지됨"
+        : "재생목록에서 곡을 선택해주세요";
+      els.connDot.classList.toggle("on", playing);
+    } else {
+      const fresh = age < 20;
+      els.statusDot.className = "dot " + (status.lastHeartbeat ? (fresh ? "fresh" : "stale") : "");
+      if (!status.lastHeartbeat) {
+        els.statusText.textContent = "재생 기기가 아직 연결되지 않았어요";
+      } else if (fresh) {
+        els.statusText.textContent = "재생 기기 연결됨 · " + Math.round(age) + "초 전 업데이트";
+      } else {
+        els.statusText.textContent = "재생 기기 응답 없음 · " + Math.round(age) + "초 전 · 화면을 확인해주세요";
+      }
+      els.connDot.classList.toggle("on", fresh);
+    }
+  }
+
+  function renderAll() {
+    renderNow(); renderPlaylist(); renderRole(); renderStatus();
+  }
+
+  // ---------- Firestore wiring ----------
+  const configRef = doc(db, "bgm", "config");
+  const controlRef = doc(db, "bgm", "control");
+  const statusRef = doc(db, "bgm", "status");
+
+  async function ensureSeedData() {
+    const snap = await getDoc(configRef);
+    if (!snap.exists()) {
+      await setDoc(configRef, { tracks: DEFAULT_TRACKS, volume: 80, loopMode: "all" });
+    }
+  }
+
+  function initFirestore() {
+    onSnapshot(configRef, (snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        config = {
+          tracks: Array.isArray(d.tracks) ? d.tracks : [],
+          volume: typeof d.volume === "number" ? d.volume : 80,
+          loopMode: d.loopMode === "one" ? "one" : "all",
+        };
+      }
+      renderAll();
+      if (role === "player") applyPlayerState();
+    });
+
+    onSnapshot(controlRef, (snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        control = {
+          isPlaying: !!d.isPlaying,
+          currentTrackId: d.currentTrackId || null,
+          updatedAt: d.updatedAt || 0,
+        };
+      }
+      renderAll();
+      if (role === "player") applyPlayerState();
+    });
+
+    onSnapshot(statusRef, (snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        status = {
+          currentTrackId: d.currentTrackId || null,
+          isPlaying: !!d.isPlaying,
+          position: d.position || 0,
+          lastHeartbeat: d.lastHeartbeat || 0,
+          deviceId: d.deviceId || null,
+        };
+      }
+      renderAll();
+    });
+  }
+
+  async function writeConfig(partial) {
+    config = { ...config, ...partial };
+    renderAll();
+    await setDoc(configRef, config).catch(() => {});
+  }
+
+  async function writeControl(partial) {
+    control = { ...control, ...partial, updatedAt: Date.now() };
+    renderAll();
+    await setDoc(controlRef, control).catch(() => {});
+  }
+
+  async function writeStatus(partial) {
+    status = { ...status, ...partial, lastHeartbeat: Date.now(), deviceId };
+    await setDoc(statusRef, status).catch(() => {});
+  }
+
+  // ---------- Player device logic ----------
+  function applyPlayerState() {
+    if (!playerStarted) return;
+    const t = trackById(control.currentTrackId);
+    if (!t) {
+      els.audioEl.pause();
+      renderAll();
+      return;
+    }
+    if (els.audioEl.dataset.trackId !== t.id) {
+      els.audioEl.dataset.trackId = t.id;
+      delete els.audioEl.dataset.loadError;
+      els.audioEl.src = t.url;
+    }
+    els.audioEl.volume = Math.min(1, Math.max(0, config.volume / 100));
+    if (control.isPlaying && els.audioEl.paused) {
+      els.audioEl.play().catch((err) => {
+        els.audioEl.dataset.loadError = err.name || "재생 실패";
+        renderAll();
+      });
+    } else if (!control.isPlaying && !els.audioEl.paused) {
+      els.audioEl.pause();
+    }
+    updateMediaSession(t);
+    renderAll();
+  }
+
+  function updateMediaSession(t) {
+    if (!("mediaSession" in navigator)) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: t.title || "EH BGM",
+      artist: "EH BGM System",
+    });
+    navigator.mediaSession.playbackState = els.audioEl.paused ? "paused" : "playing";
+    navigator.mediaSession.setActionHandler("play", () => writeControl({ isPlaying: true }));
+    navigator.mediaSession.setActionHandler("pause", () => writeControl({ isPlaying: false }));
+    navigator.mediaSession.setActionHandler("previoustrack", () => {
+      writeControl({ currentTrackId: nextTrackId(control.currentTrackId, "prev"), isPlaying: true });
+    });
+    navigator.mediaSession.setActionHandler("nexttrack", () => {
+      writeControl({ currentTrackId: nextTrackId(control.currentTrackId, "next"), isPlaying: true });
+    });
+  }
+
+  els.audioEl.addEventListener("ended", () => {
+    if (role !== "player") return;
+    const nid = nextTrackId(control.currentTrackId, "auto");
+    writeControl({ currentTrackId: nid, isPlaying: true });
+  });
+
+  els.audioEl.addEventListener("timeupdate", () => {
+    if (role !== "player") return;
+    if (!seeking) {
+      const dur = els.audioEl.duration || 0;
+      const cur = els.audioEl.currentTime || 0;
+      els.progressFill.style.width = dur ? (cur / dur * 100) + "%" : "0%";
+      els.timeCur.textContent = fmtTime(cur);
+      els.timeDur.textContent = fmtTime(dur);
+    }
+    if (!els.audioEl._lastHb || Date.now() - els.audioEl._lastHb > 5000) {
+      els.audioEl._lastHb = Date.now();
+      writeStatus({
+        currentTrackId: control.currentTrackId,
+        isPlaying: !els.audioEl.paused,
+        position: els.audioEl.currentTime || 0,
+      });
+    }
+  });
+
+  els.audioEl.addEventListener("error", () => {
+    if (role !== "player") return;
+    const codes = { 1: "로드 중단", 2: "네트워크 오류", 3: "디코딩 실패", 4: "지원되지 않는 링크/형식" };
+    els.audioEl.dataset.loadError = codes[els.audioEl.error && els.audioEl.error.code] || "알 수 없는 오류";
+    renderAll();
+  });
+
+  els.audioEl.addEventListener("play", () => { renderAll(); updateMediaSession(trackById(control.currentTrackId)); });
+  els.audioEl.addEventListener("pause", () => { renderAll(); updateMediaSession(trackById(control.currentTrackId)); });
+
+  els.startPlayerBtn.addEventListener("click", () => {
+    playerStarted = true;
+    const id = validCurrentId();
+    const t = id ? trackById(id) : null;
+    if (t) {
+      els.audioEl.dataset.trackId = t.id;
+      delete els.audioEl.dataset.loadError;
+      els.audioEl.src = t.url;
+      els.audioEl.volume = Math.min(1, Math.max(0, config.volume / 100));
+      els.audioEl.play().catch((err) => {
+        els.audioEl.dataset.loadError = err.name || "재생 실패";
+        renderAll();
+      });
+    }
+    renderAll();
+    writeControl({ currentTrackId: id, isPlaying: !!t });
+  });
+
+  // ---------- Controller-side timer for progress display ----------
+  setInterval(() => {
+    if (role === "player") return;
+    if (status.isPlaying && status.lastHeartbeat) {
+      const elapsed = (Date.now() - status.lastHeartbeat) / 1000;
+      const cur = status.position + elapsed;
+      els.timeCur.textContent = fmtTime(cur);
+      els.progressFill.style.width = "0%";
+    }
+    renderStatus();
+  }, 1000);
+
+  // ---------- Shared controls ----------
+  els.playBtn.addEventListener("click", () => {
+    if (role === "player") {
+      if (!playerStarted) { els.startPlayerBtn.click(); return; }
+      const id = validCurrentId();
+      if (!id) return;
+      const t = trackById(id);
+      const willPlay = els.audioEl.paused;
+      if (t && willPlay) {
+        if (els.audioEl.dataset.trackId !== t.id) {
+          els.audioEl.dataset.trackId = t.id;
+          delete els.audioEl.dataset.loadError;
+          els.audioEl.src = t.url;
+        }
+        els.audioEl.play().catch((err) => {
+          els.audioEl.dataset.loadError = err.name || "재생 실패";
+          renderAll();
+        });
+      } else if (!willPlay) {
+        els.audioEl.pause();
+      }
+      writeControl({ isPlaying: willPlay, currentTrackId: id });
+    } else {
+      const playing = status.isPlaying;
+      const id = validCurrentId();
+      writeControl({ isPlaying: !playing, currentTrackId: id });
+    }
+  });
+
+  els.prevBtn.addEventListener("click", () => {
+    const id = nextTrackId(validCurrentId(), "prev");
+    writeControl({ currentTrackId: id, isPlaying: true });
+  });
+  els.nextBtn.addEventListener("click", () => {
+    const id = nextTrackId(validCurrentId(), "next");
+    writeControl({ currentTrackId: id, isPlaying: true });
+  });
+
+  els.volSlider.addEventListener("input", () => {
+    writeConfig({ volume: Number(els.volSlider.value) });
+    if (role === "player") els.audioEl.volume = Number(els.volSlider.value) / 100;
+  });
+
+  els.loopAll.addEventListener("click", () => writeConfig({ loopMode: "all" }));
+  els.loopOne.addEventListener("click", () => writeConfig({ loopMode: "one" }));
+
+  els.playlist.addEventListener("click", (e) => {
+    const del = e.target.closest(".del");
+    if (del) {
+      const id = del.dataset.id;
+      const remaining = config.tracks.filter(t => t.id !== id);
+      writeConfig({ tracks: remaining });
+      if (control.currentTrackId === id) {
+        const fallback = remaining[0] ? remaining[0].id : null;
+        writeControl({ currentTrackId: fallback, isPlaying: fallback ? control.isPlaying : false });
+      }
+      return;
+    }
+    const meta = e.target.closest(".meta");
+    if (meta) {
+      const id = meta.dataset.id;
+      writeControl({ currentTrackId: id, isPlaying: true });
+    }
+  });
+
+  els.addForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const url = els.addUrl.value.trim();
+    if (!url) return;
+    const title = els.addTitle.value.trim();
+    const id = "t-" + Math.random().toString(36).slice(2, 10);
+    const hadNoValidTrack = !trackById(control.currentTrackId);
+    await writeConfig({ tracks: [...config.tracks, { id, title, url }] });
+    if (role === "player" && playerStarted && hadNoValidTrack) {
+      writeControl({ currentTrackId: id, isPlaying: true });
+    }
+    els.addTitle.value = "";
+    els.addUrl.value = "";
+    els.addTitle.focus();
+  });
+
+  els.roleController.addEventListener("click", () => {
+    role = "controller";
+    localStorage.setItem(DEVICE_KEY, role);
+    renderAll();
+  });
+  els.rolePlayer.addEventListener("click", () => {
+    role = "player";
+    localStorage.setItem(DEVICE_KEY, role);
+    renderAll();
+  });
+
+  renderAll();
+  ensureSeedData().then(initFirestore);
+})();
+</script>
+</body>
+</html>
