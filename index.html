@@ -652,6 +652,15 @@ const db = getFirestore(app);
     switchStore(id);
   }
 
+  async function renameStore(id) {
+    const current = stores.find(s => s.id === id);
+    const name = prompt("매장 이름 수정", current ? current.name : "");
+    if (!name || !name.trim()) return;
+    stores = stores.map(s => s.id === id ? { ...s, name: name.trim() } : s);
+    renderStoreSelector();
+    await setDoc(storesMetaRef, { stores }).catch(() => {});
+  }
+
   function renderStoreSelector() {
     if (!els.storeSelector) return;
     els.storeSelector.innerHTML = "";
@@ -659,7 +668,9 @@ const db = getFirestore(app);
       const btn = document.createElement("button");
       btn.className = "chip" + (s.id === storeId ? " active" : "");
       btn.textContent = s.name;
+      btn.title = "더블클릭하면 이름 수정";
       btn.addEventListener("click", () => switchStore(s.id));
+      btn.addEventListener("dblclick", (e) => { e.stopPropagation(); renameStore(s.id); });
       els.storeSelector.appendChild(btn);
     });
     const addBtn = document.createElement("button");
