@@ -103,6 +103,12 @@ header.top .role{ font-size:12px; color:var(--text-muted); }
 }
 .meter i.lit{ background:var(--amber); }
 
+.progress-wrap{
+  padding:10px 0;
+  margin:-10px 0;
+  cursor:pointer;
+  touch-action:none;
+}
 .progress{
   height:4px;
   border-radius:2px;
@@ -110,6 +116,8 @@ header.top .role{ font-size:12px; color:var(--text-muted); }
   overflow:hidden;
   position:relative;
 }
+.progress-wrap:hover .progress,
+.progress-wrap.seeking .progress{ height:6px; }
 .progress .fill{
   position:absolute; inset:0 auto 0 0;
   width:0%;
@@ -305,7 +313,9 @@ audio{ display:none; }
     <div class="label">지금 재생 중</div>
     <div class="title empty" id="nowTitle">불러오는 중…</div>
     <div class="meter" id="meter"></div>
-    <div class="progress"><div class="fill" id="progressFill"></div></div>
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress"><div class="fill" id="progressFill"></div></div>
+    </div>
     <div class="time-row mono">
       <span id="timeCur">0:00</span>
       <span id="timeDur">0:00</span>
@@ -409,6 +419,7 @@ const db = getFirestore(app);
     playerHint: $("playerHint"), startPlayerBtn: $("startPlayerBtn"),
     audioEl: $("audioEl"), storeSelector: $("storeSelector"),
     playlistToggle: $("playlistToggle"), playlistChevron: $("playlistChevron"),
+    progressWrap: $("progressWrap"),
   };
 
   const ICON_PLAY = '<path d="M8 5v14l11-7z"/>';
@@ -444,10 +455,11 @@ const db = getFirestore(app);
   ];
 
   let config = { tracks: [], volume: 80, loopMode: "all" };
-  let control = { isPlaying: false, currentTrackId: null, updatedAt: 0 };
+  let control = { isPlaying: false, currentTrackId: null, updatedAt: 0, seekTo: 0, seekAt: 0 };
   let status = { currentTrackId: null, isPlaying: false, position: 0, duration: 0, lastHeartbeat: 0, deviceId: null };
 
   let playerStarted = false;
+  let appliedSeekAt = 0;
   let seeking = false;
 
   function fmtTime(s) {
@@ -616,10 +628,11 @@ const db = getFirestore(app);
 
   function subscribeToStore(id) {
     if (unsubStore) { unsubStore(); unsubStore = null; }
-    control = { isPlaying: false, currentTrackId: null, updatedAt: 0 };
+    control = { isPlaying: false, currentTrackId: null, updatedAt: 0, seekTo: 0, seekAt: 0 };
     status = { currentTrackId: null, isPlaying: false, position: 0, duration: 0, lastHeartbeat: 0, deviceId: null };
     config = { tracks: [], volume: 80, loopMode: "all" };
     playerStarted = false;
+    appliedSeekAt = 0;
     els.audioEl.pause();
     els.audioEl.removeAttribute("src");
     delete els.audioEl.dataset.trackId;
@@ -641,6 +654,8 @@ const db = getFirestore(app);
             isPlaying: !!d.control.isPlaying,
             currentTrackId: d.control.currentTrackId || null,
             updatedAt: d.control.updatedAt || 0,
+            seekTo: typeof d.control.seekTo === "number" ? d.control.seekTo : 0,
+            seekAt: d.control.seekAt || 0,
           };
         }
         if (d.status) {
@@ -765,6 +780,12 @@ const db = getFirestore(app);
       els.audioEl.src = t.url;
     }
     els.audioEl.volume = Math.min(1, Math.max(0, config.volume / 100));
+    // Seeking is just setting currentTime — no iOS gesture requirement,
+    // so a remote (controller-initiated) seek applies immediately here.
+    if (control.seekAt && control.seekAt !== appliedSeekAt) {
+      appliedSeekAt = control.seekAt;
+      try { els.audioEl.currentTime = control.seekTo || 0; } catch (e) {}
+    }
     if (control.isPlaying) {
       els.audioEl.muted = false;
       if (els.audioEl.paused) {
@@ -838,6 +859,62 @@ const db = getFirestore(app);
   els.audioEl.addEventListener("play", () => { renderAll(); updateMediaSession(trackById(control.currentTrackId)); });
   els.audioEl.addEventListener("pause", () => { renderAll(); updateMediaSession(trackById(control.currentTrackId)); });
 
+  // ---------- Seek bar (tap or drag to jump to a point in the track) ----------
+  function currentDuration() {
+    return role === "player" ? (els.audioEl.duration || 0) : (status.duration || 0);
+  }
+  function seekRatioFromEvent(e) {
+    const rect = els.progressWrap.getBoundingClientRect();
+    const x = (e.clientX != null ? e.clientX : 0) - rect.left;
+    return rect.width ? Math.min(1, Math.max(0, x / rect.width)) : 0;
+  }
+  function previewSeek(ratio) {
+    const dur = currentDuration();
+    els.progressFill.style.width = (ratio * 100) + "%";
+    els.timeCur.textContent = fmtTime(ratio * dur);
+  }
+  function commitSeek(ratio) {
+    const dur = currentDuration();
+    if (!dur) return;
+    const target = ratio * dur;
+    if (role === "player") {
+      if (!els.audioEl.dataset.trackId) return;
+      const seekAt = Date.now();
+      appliedSeekAt = seekAt;
+      els.audioEl.currentTime = target;
+      writeControl({ seekTo: target, seekAt });
+    } else {
+      if (!validCurrentId()) return;
+      writeControl({ seekTo: target, seekAt: Date.now() });
+    }
+  }
+
+  let seekPointerActive = false;
+  els.progressWrap.addEventListener("pointerdown", (e) => {
+    seekPointerActive = true;
+    seeking = true;
+    els.progressWrap.classList.add("seeking");
+    try { els.progressWrap.setPointerCapture(e.pointerId); } catch (err) {}
+    previewSeek(seekRatioFromEvent(e));
+  });
+  els.progressWrap.addEventListener("pointermove", (e) => {
+    if (!seekPointerActive) return;
+    previewSeek(seekRatioFromEvent(e));
+  });
+  function endSeek(e) {
+    if (!seekPointerActive) return;
+    seekPointerActive = false;
+    seeking = false;
+    els.progressWrap.classList.remove("seeking");
+    commitSeek(seekRatioFromEvent(e));
+  }
+  els.progressWrap.addEventListener("pointerup", endSeek);
+  els.progressWrap.addEventListener("pointercancel", () => {
+    seekPointerActive = false;
+    seeking = false;
+    els.progressWrap.classList.remove("seeking");
+  });
+
   els.startPlayerBtn.addEventListener("click", () => {
     playerStarted = true;
     const id = validCurrentId();
@@ -859,6 +936,7 @@ const db = getFirestore(app);
   // ---------- Controller-side timer for progress display ----------
   setInterval(() => {
     if (role === "player") return;
+    if (seeking) { renderStatus(); return; }
     const dur = status.duration || 0;
     els.timeDur.textContent = fmtTime(dur);
     if (status.isPlaying && status.lastHeartbeat) {
